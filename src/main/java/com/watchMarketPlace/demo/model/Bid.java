@@ -1,14 +1,12 @@
 package com.watchMarketPlace.demo.model;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
@@ -21,44 +19,22 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-public class Item {
+public class Bid {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "item_id")
+    private Item item;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;
 
     @Column(nullable = false)
-    private String title;
+    private double amount;
 
     @Column(nullable = false)
-    private String description;
-
-    @Column(nullable = false)
-    private double price;
-
-    @Column(nullable = false)
-    private boolean biddingEnabled = false;
-
-    @Column
-    private Double startingPrice;
-
-    @Column
-    private Double buyNowPrice;
-
-    @Column
-    private Double currentPrice;
-
-    @Column
-    private LocalDateTime endTime;
-
-    @Column(nullable = false)
-    private boolean isActive = true;
-
-    @OneToMany(mappedBy = "item")
-    private List<Bid> bids;
-
     private LocalDateTime createdAt = LocalDateTime.now();
-}
+} 
