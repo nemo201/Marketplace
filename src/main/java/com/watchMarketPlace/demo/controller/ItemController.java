@@ -63,7 +63,8 @@ public class ItemController {
      * @return List of all items
      */
     @GetMapping
-    public ResponseEntity<List<Item>> getAllItems() {
+    public ResponseEntity<List<Item>> getAllItems(HttpServletRequest request) {
+        getAuthenticatedUser(request); // This will validate the token
         List<Item> items = itemService.getAllItems();
         return ResponseEntity.ok(items);
     }

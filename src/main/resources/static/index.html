@@ -75,6 +75,14 @@
 
         <!-- Items Section -->
         <div id="itemsSection" style="display: none;">
+            <div class="row mb-4">
+                <div class="col">
+                    <button class="btn btn-primary" onclick="showCreateItemForm()">Add New Item</button>
+                </div>
+                <div class="col text-end">
+                    <button class="btn btn-outline-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
             <div class="row" id="itemsList">
                 <!-- Items will be populated here -->
             </div>
@@ -111,11 +119,64 @@
         </div>
     </div>
 
+    <!-- Create Item Modal -->
+    <div class="modal fade" id="createItemModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createItemForm">
+                        <div class="mb-3">
+                            <label for="itemTitle" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="itemTitle" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="itemDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="itemDescription" rows="3" required></textarea>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="enableBidding">
+                            <label class="form-check-label" for="enableBidding">Enable Bidding</label>
+                        </div>
+                        <div id="regularPriceSection">
+                            <div class="mb-3">
+                                <label for="itemPrice" class="form-label">Price</label>
+                                <input type="number" class="form-control" id="itemPrice" min="0" step="0.01">
+                            </div>
+                        </div>
+                        <div id="biddingOptions" style="display: none;">
+                            <div class="mb-3">
+                                <label for="startingPrice" class="form-label">Starting Price</label>
+                                <input type="number" class="form-control" id="startingPrice" min="0" step="0.01">
+                            </div>
+                            <div class="mb-3">
+                                <label for="itemBuyNowPrice" class="form-label">Buy Now Price</label>
+                                <input type="number" class="form-control" id="itemBuyNowPrice" min="0" step="0.01">
+                            </div>
+                            <div class="mb-3">
+                                <label for="endTime" class="form-label">End Time</label>
+                                <input type="datetime-local" class="form-control" id="endTime">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="createItem()">Create Item</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let currentToken = '';
         let currentItemId = null;
         const modal = new bootstrap.Modal(document.getElementById('itemModal'));
+        const createItemModal = new bootstrap.Modal(document.getElementById('createItemModal'));
 
         function toggleAuthForm() {
             const loginForm = document.getElementById('loginForm');
@@ -150,16 +211,41 @@
 
                 console.log('Login response status:', response.status);
                 const responseText = await response.text();
-                console.log('Login response:', responseText);
+                console.log('Login response text:', responseText);
 
                 if (response.ok) {
-                    const data = JSON.parse(responseText);
-                    console.log('Login successful, received token');
-                    currentToken = data.token;
-                    document.getElementById('authSection').style.display = 'none';
-                    document.getElementById('itemsSection').style.display = 'block';
-                    loadItems();
+                    try {
+                        const data = JSON.parse(responseText);
+                        console.log('Parsed login response:', data);
+                        
+                        if (!data.token) {
+                            console.error('No token in response:', data);
+                            throw new Error('No token received from server');
+                        }
+                        
+                        // Store token in localStorage
+                        localStorage.setItem('token', data.token);
+                        currentToken = data.token;
+                        console.log('Token stored successfully');
+                        
+                        // Clear the login form
+                        document.getElementById('loginEmail').value = '';
+                        document.getElementById('loginPassword').value = '';
+                        
+                        // Show items section
+                        document.getElementById('authSection').style.display = 'none';
+                        document.getElementById('itemsSection').style.display = 'block';
+                        
+                        // Load items
+                        await loadItems();
+                    } catch (parseError) {
+                        console.error('Error parsing login response:', parseError);
+                        console.error('Response text was:', responseText);
+                        alert('Invalid response from server. Please try again.');
+                    }
                 } else {
+                    console.error('Login failed with status:', response.status);
+                    console.error('Response text:', responseText);
                     alert('Login failed: ' + responseText);
                 }
             } catch (error) {
@@ -200,8 +286,15 @@
 
                 if (response.ok) {
                     alert('Registration successful! Please login.');
+                    // Clear the registration form
+                    document.getElementById('registerUsername').value = '';
+                    document.getElementById('registerEmail').value = '';
+                    document.getElementById('registerPassword').value = '';
+                    document.getElementById('registerConfirmPassword').value = '';
                     toggleAuthForm(); // Switch to login form
                 } else {
+                    console.error('Registration failed with status:', response.status);
+                    console.error('Response text:', responseText);
                     alert('Registration failed: ' + responseText);
                 }
             } catch (error) {
@@ -210,81 +303,88 @@
             }
         }
 
-        async function loadItems() {
-            try {
-                const response = await fetch('/items', {
-                    headers: {
-                        'Authorization': `Bearer ${currentToken}`
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const items = await response.json();
-                const itemsList = document.getElementById('itemsList');
-                itemsList.innerHTML = '';
-
-                items.forEach(item => {
-                    const itemCard = `
-                        <div class="col-md-4">
-                            <div class="card item-card">
-                                <div class="card-body">
-                                    <h5 class="card-title">${item.title}</h5>
-                                    <p class="card-text">${item.description}</p>
-                                    <p class="card-text">
-                                        <strong>Price:</strong> $${item.price}<br>
-                                        ${item.biddingEnabled ? `<strong>Current Bid:</strong> $${item.currentPrice}<br>` : ''}
-                                        <strong>Buy Now:</strong> $${item.buyNowPrice}
-                                    </p>
-                                    <button class="btn btn-primary" onclick="showItemDetails(${item.id})">
-                                        View Details
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    itemsList.innerHTML += itemCard;
-                });
-            } catch (error) {
-                console.error('Error loading items:', error);
-                alert('Error loading items. Please try logging in again.');
-                // If there's an error, show the auth section again
-                document.getElementById('authSection').style.display = 'block';
-                document.getElementById('itemsSection').style.display = 'none';
+        // Add this function to get the current token
+        function getCurrentToken() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showLoginForm();
+                throw new Error('No authentication token found');
             }
+            return token;
         }
 
         async function showItemDetails(itemId) {
             currentItemId = itemId;
             try {
+                const token = getCurrentToken();
+                console.log('Loading item details for ID:', itemId);
+
                 const [itemResponse, bidsResponse] = await Promise.all([
-                    fetch(`/items/${itemId}`),
-                    fetch(`/items/${itemId}/bids`)
+                    fetch(`/items/${itemId}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    }),
+                    fetch(`/items/${itemId}/bids`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    })
                 ]);
+
+                if (!itemResponse.ok) {
+                    throw new Error(`Failed to load item details: ${itemResponse.status}`);
+                }
+
+                if (!bidsResponse.ok) {
+                    throw new Error(`Failed to load bid history: ${bidsResponse.status}`);
+                }
 
                 const item = await itemResponse.json();
                 const bids = await bidsResponse.json();
 
+                console.log('Item details:', item);
+                console.log('Bid history:', bids);
+
                 document.getElementById('itemDetails').innerHTML = `
                     <h4>${item.title}</h4>
                     <p>${item.description}</p>
-                    <p><strong>Current Price:</strong> $${item.price}</p>
-                    <p><strong>Buy Now Price:</strong> $${item.buyNowPrice}</p>
+                    ${item.biddingEnabled ? 
+                        `<p><strong>Starting Bid:</strong> $${item.startingPrice}</p>
+                         <p><strong>Current Bid:</strong> $${item.currentPrice || item.startingPrice}</p>
+                         <p><strong>Buy Now Price:</strong> $${item.buyNowPrice}</p>
+                         <p><strong>Ends:</strong> ${new Date(item.endTime).toLocaleString()}</p>` 
+                        : 
+                        `<p><strong>Price:</strong> $${item.price}</p>`
+                    }
                 `;
 
                 const bidHistory = document.getElementById('bidHistory');
-                bidHistory.innerHTML = bids.map(bid => `
-                    <div class="border-bottom p-2">
-                        <small>Bid: $${bid.amount} by ${bid.user.email}</small>
-                    </div>
-                `).join('');
+                if (bids && bids.length > 0) {
+                    bidHistory.innerHTML = bids.map(bid => `
+                        <div class="border-bottom p-2">
+                            <small>Bid: $${bid.amount} by ${bid.user.email}</small>
+                        </div>
+                    `).join('');
+                } else {
+                    bidHistory.innerHTML = '<p class="text-muted">No bids yet</p>';
+                }
+
+                // Show/hide bidding section based on item type
+                const biddingSection = document.querySelector('.modal-body .mt-3');
+                if (biddingSection) {
+                    biddingSection.style.display = item.biddingEnabled ? 'block' : 'none';
+                }
 
                 modal.show();
             } catch (error) {
                 console.error('Error loading item details:', error);
-                alert('Error loading item details.');
+                if (error.message.includes('401') || error.message.includes('403') || error.message.includes('No authentication token found')) {
+                    alert('Your session has expired. Please log in again.');
+                    showLoginForm();
+                } else {
+                    alert('Error loading item details: ' + error.message);
+                }
             }
         }
 
@@ -335,6 +435,202 @@
                 console.error('Error buying item:', error);
                 alert('Error buying item.');
             }
+        }
+
+        function showCreateItemForm() {
+            document.getElementById('createItemForm').reset();
+            document.getElementById('biddingOptions').style.display = 'none';
+            createItemModal.show();
+        }
+
+        document.getElementById('enableBidding').addEventListener('change', function() {
+            const biddingOptions = document.getElementById('biddingOptions');
+            const regularPriceSection = document.getElementById('regularPriceSection');
+            if (this.checked) {
+                biddingOptions.style.display = 'block';
+                regularPriceSection.style.display = 'none';
+                document.getElementById('itemPrice').required = false;
+                document.getElementById('startingPrice').required = true;
+                document.getElementById('itemBuyNowPrice').required = true;
+                document.getElementById('endTime').required = true;
+            } else {
+                biddingOptions.style.display = 'none';
+                regularPriceSection.style.display = 'block';
+                document.getElementById('itemPrice').required = true;
+                document.getElementById('startingPrice').required = false;
+                document.getElementById('itemBuyNowPrice').required = false;
+                document.getElementById('endTime').required = false;
+            }
+        });
+
+        async function createItem() {
+            const title = document.getElementById('itemTitle').value;
+            const description = document.getElementById('itemDescription').value;
+            const enableBidding = document.getElementById('enableBidding').checked;
+            
+            if (!title || !description) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            try {
+                const token = getCurrentToken();
+                let itemData = {
+                    title,
+                    description,
+                    biddingEnabled: enableBidding
+                };
+
+                if (enableBidding) {
+                    const startingPrice = parseFloat(document.getElementById('startingPrice').value);
+                    const buyNowPrice = parseFloat(document.getElementById('itemBuyNowPrice').value);
+                    const endTime = document.getElementById('endTime').value;
+
+                    if (!startingPrice || !buyNowPrice || !endTime) {
+                        alert('Please fill in all bidding fields');
+                        return;
+                    }
+
+                    itemData = {
+                        ...itemData,
+                        startingPrice,
+                        buyNowPrice,
+                        endTime: new Date(endTime).toISOString(),
+                        price: startingPrice  // Set price to starting price for bidding items
+                    };
+                } else {
+                    const price = parseFloat(document.getElementById('itemPrice').value);
+                    if (!price) {
+                        alert('Please enter a price');
+                        return;
+                    }
+                    itemData = {
+                        ...itemData,
+                        price
+                    };
+                }
+
+                const response = await fetch('/items', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(itemData)
+                });
+
+                if (response.ok) {
+                    alert('Item created successfully!');
+                    createItemModal.hide();
+                    loadItems();
+                } else {
+                    const error = await response.text();
+                    alert('Failed to create item: ' + error);
+                }
+            } catch (error) {
+                console.error('Error creating item:', error);
+                if (error.message.includes('No authentication token found')) {
+                    alert('Your session has expired. Please log in again.');
+                    showLoginForm();
+                } else {
+                    alert('An error occurred while creating the item');
+                }
+            }
+        }
+
+        function showLoginForm() {
+            document.getElementById('authSection').style.display = 'block';
+            document.getElementById('itemsSection').style.display = 'none';
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('registerForm').style.display = 'none';
+            localStorage.removeItem('token');
+            currentToken = '';
+        }
+
+        // Add this function to check authentication status on page load
+        function checkAuthStatus() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                currentToken = token;
+                document.getElementById('authSection').style.display = 'none';
+                document.getElementById('itemsSection').style.display = 'block';
+                loadItems();
+            } else {
+                showLoginForm();
+            }
+        }
+
+        // Call checkAuthStatus when the page loads
+        document.addEventListener('DOMContentLoaded', checkAuthStatus);
+
+        async function loadItems() {
+            try {
+                const token = getCurrentToken();
+                console.log('Loading items with token:', token);
+                
+                const response = await fetch('/items', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                console.log('Items response status:', response.status);
+                const responseText = await response.text();
+                console.log('Items response text:', responseText);
+
+                if (!response.ok) {
+                    throw new Error(`Failed to load items: ${response.status}`);
+                }
+
+                const items = JSON.parse(responseText);
+                if (!Array.isArray(items)) {
+                    throw new Error('Invalid response format: expected an array of items');
+                }
+
+                const itemsList = document.getElementById('itemsList');
+                itemsList.innerHTML = items.map(item => `
+                    <div class="col-md-4">
+                        <div class="card item-card">
+                            <div class="card-body">
+                                <h5 class="card-title">${item.title}</h5>
+                                <p class="card-text">${item.description}</p>
+                                ${item.biddingEnabled ? 
+                                    `<p><strong>Current Bid:</strong> $${item.currentPrice || item.startingPrice}</p>
+                                     <p><strong>Buy Now:</strong> $${item.buyNowPrice}</p>
+                                     <p><strong>Ends:</strong> ${new Date(item.endTime).toLocaleString()}</p>` 
+                                    : 
+                                    `<p><strong>Price:</strong> $${item.price}</p>`
+                                }
+                                <button class="btn btn-primary" onclick="showItemDetails(${item.id})">View Details</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading items:', error);
+                if (error.message.includes('401') || error.message.includes('403') || error.message.includes('No authentication token found')) {
+                    alert('Your session has expired. Please log in again.');
+                    showLoginForm();
+                } else {
+                    alert('Error loading items: ' + error.message);
+                }
+            }
+        }
+
+        // Add this function to handle logout
+        function logout() {
+            // Clear the token from localStorage
+            localStorage.removeItem('token');
+            currentToken = '';
+            
+            // Show the login form
+            showLoginForm();
+            
+            // Clear any existing items
+            document.getElementById('itemsList').innerHTML = '';
+            
+            // Show success message
+            alert('You have been successfully logged out.');
         }
     </script>
 </body>

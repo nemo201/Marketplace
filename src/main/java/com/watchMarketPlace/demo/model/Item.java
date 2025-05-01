@@ -11,6 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Column;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -37,19 +38,19 @@ public class Item {
     private String description;
 
     @Column(nullable = false)
-    private double price;
+    private Double price;  // Regular price for non-bidding items
 
     @Column(nullable = false)
     private boolean biddingEnabled = false;
 
     @Column
-    private Double startingPrice;
+    private Double startingPrice;  // Starting price for bidding items
 
     @Column
-    private Double buyNowPrice;
+    private Double buyNowPrice;  // Buy now price for bidding items
 
     @Column
-    private Double currentPrice;
+    private Double currentPrice;  // Current highest bid for bidding items
 
     @Column
     private LocalDateTime endTime;
@@ -57,6 +58,7 @@ public class Item {
     @Column(nullable = false)
     private boolean isActive = true;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "item")
     private List<Bid> bids;
 
