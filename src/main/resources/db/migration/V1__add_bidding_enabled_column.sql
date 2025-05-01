@@ -1,0 +1,1 @@
+ALTER TABLE item ADD COLUMN bidding_enabled BOOLEAN NOT NULL DEFAULT false; 

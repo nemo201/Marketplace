@@ -32,6 +32,16 @@ public class ItemController {
     @Autowired
     private UserRepository userRepository;
 
+    @GetMapping("/test")
+    public ResponseEntity<String> testConnection() {
+        try {
+            return ResponseEntity.ok("Database connection is working!");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Database connection error: " + e.getMessage());
+        }
+    }
+
     /**
      * Create a new item listing.
      *
